@@ -29,7 +29,7 @@ public class Site implements Parcelable {
     }
 
     public String getResourceLoaderPath() {
-        return "https://bits.wikimedia.org/" + language + ".wikipedia.org/load.php";
+        return "https://bits.wikimedia.org/" + language + ".wikivoyage.org/load.php";
     }
 
     public String getApiDomain() {
@@ -120,7 +120,7 @@ public class Site implements Parcelable {
     }
 
     public static Site forLang(String lang) {
-        return new Site(lang + ".wikipedia.org", lang);
+        return new Site(lang + ".wikivoyage.org", lang);
     }
 
     /**
@@ -129,6 +129,6 @@ public class Site implements Parcelable {
      * @return boolean
      */
     public static boolean isSupportedSite(String domain) {
-        return domain.matches("[a-z\\-]+\\.(m\\.)?wikipedia\\.org");
+        return domain.matches("[a-z\\-]+\\.(m\\.)?wikivoyage\\.org");
     }
 }
