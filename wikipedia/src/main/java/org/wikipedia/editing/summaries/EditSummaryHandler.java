@@ -22,7 +22,6 @@ public class EditSummaryHandler {
     private final Activity activity;
     private final View container;
     private final AutoCompleteTextView summaryEdit;
-    private final EditSummaryAdapter adapter;
 
     public EditSummaryHandler(final Activity activity, final View parent, PageTitle title) {
         this.activity = activity;
@@ -48,16 +47,18 @@ public class EditSummaryHandler {
             // because mDropDownListHighlight seems to be null instead
             // of an expected drawable, and that ends up failing when used.
 
-            adapter = new EditSummaryAdapter(activity, null, true);
+            final EditSummaryAdapter adapter = new EditSummaryAdapter(activity, null, true);
             summaryEdit.setAdapter(adapter);
 
             adapter.setFilterQueryProvider(new FilterQueryProvider() {
                 @Override
                 public Cursor runQuery(CharSequence charSequence) {
-                    ContentProviderClient client = activity.getContentResolver().acquireContentProviderClient(EditSummary.PERSISTANCE_HELPER.getBaseContentURI());
+                    ContentProviderClient client = activity.getContentResolver().acquireContentProviderClient(EditSummary.PERSISTENCE_HELPER
+
+                                                                                                                      .getBaseContentURI());
                     try {
                         return client.query(
-                                EditSummary.PERSISTANCE_HELPER.getBaseContentURI(),
+                                EditSummary.PERSISTENCE_HELPER.getBaseContentURI(),
                                 null,
                                 "summary LIKE ?",
                                 new String[] {charSequence + "%"},
@@ -68,8 +69,6 @@ public class EditSummaryHandler {
                     }
                 }
             });
-        } else {
-            adapter = null;
         }
 
         Utils.setTextDirection(summaryEdit, title.getSite().getLanguage());
@@ -110,7 +109,7 @@ public class EditSummaryHandler {
 
         @Override
         public CharSequence convertToString(Cursor cursor) {
-            return EditSummary.PERSISTANCE_HELPER.fromCursor(cursor).getSummary();
+            return EditSummary.PERSISTENCE_HELPER.fromCursor(cursor).getSummary();
         }
     }
 }
