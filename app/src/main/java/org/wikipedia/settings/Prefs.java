@@ -309,8 +309,7 @@ public final class Prefs {
 
     @NonNull
     public static Uri getMediaWikiBaseUri() {
-        return Uri.parse(StringUtil.defaultIfBlank(getString(R.string.preference_key_mediawiki_base_uri, null),
-                "https://wikipedia.org"));
+        return Uri.parse("https://wikivoyage.org");
     }
 
     public static long getLastRunTime(@NonNull String task) {

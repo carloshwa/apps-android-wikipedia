@@ -38,7 +38,7 @@ def computeVersionName(label) {
 }
 
 final JavaVersion JAVA_VERSION = JavaVersion.VERSION_1_7
-if (JavaVersion.current() != JAVA_VERSION) {
+if (JavaVersion.current() < JAVA_VERSION) {
     throw new IllegalStateException("Incorrect Java Development Kit version; expected "
             + JAVA_VERSION + " but found " + JavaVersion.current())
 }
