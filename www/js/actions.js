@@ -1,4 +1,5 @@
 var bridge = require('./bridge');
+var util = require('./utilities');
 
 function ActionsHandler() {
 }
@@ -16,21 +17,6 @@ ActionsHandler.prototype.register = function( action, fun ) {
 bridge.registerListener( "handleReference", function( payload ) {
     handleReference( payload.anchor, false );
 });
-
-function ancestorContainsClass( element, className ) {
-    var contains = false;
-    var curNode = element;
-    while (curNode) {
-        if ((typeof curNode.classList !== "undefined")) {
-            if (curNode.classList.contains(className)) {
-                contains = true;
-                break;
-            }
-        }
-        curNode = curNode.parentNode;
-    }
-    return contains;
-}
 
 function handleReference( targetId, backlink ) {
     var targetElem = document.getElementById( targetId );
@@ -58,7 +44,7 @@ document.onclick = function() {
     // If an element was clicked, check if it or any of its parents are <a>
     // This handles cases like <a>foo</a>, <a><strong>foo</strong></a>, etc.
     while (curNode) {
-        if (curNode.tagName === "A") {
+        if (curNode.tagName === "A" || curNode.tagName === "AREA") {
             sourceNode = curNode;
             break;
         }
@@ -76,13 +62,9 @@ document.onclick = function() {
             var href = sourceNode.getAttribute( "href" );
             if ( href[0] === "#" ) {
                 var targetId = href.slice(1);
-                if ( "issues" === targetId ) {
-                    issuesClicked( sourceNode );
-                } else if ( "disambig" === targetId ) {
-                    disambigClicked( sourceNode );
-                } else {
-                    handleReference( targetId, ancestorContainsClass( sourceNode, "mw-cite-backlink" ) );
-                }
+                handleReference( targetId, util.ancestorContainsClass( sourceNode, "mw-cite-backlink" ) );
+            } else if (sourceNode.classList.contains( 'app_media' )) {
+                bridge.sendMessage( 'mediaClicked', { "href": href } );
             } else if (sourceNode.classList.contains( 'image' )) {
                 bridge.sendMessage( 'imageClicked', { "href": href } );
             } else {
@@ -92,40 +74,5 @@ document.onclick = function() {
         }
     }
 };
-
-function issuesClicked( sourceNode ) {
-    var issues = collectIssues( sourceNode.parentNode );
-    var disambig = collectDisambig( sourceNode.parentNode.parentNode ); // not clicked node
-    bridge.sendMessage( 'issuesClicked', { "hatnotes": disambig, "issues": issues } );
-}
-
-function disambigClicked( sourceNode ) {
-    var disambig = collectDisambig( sourceNode.parentNode );
-    var issues = collectIssues( sourceNode.parentNode.parentNode ); // not clicked node
-    bridge.sendMessage( 'disambigClicked', { "hatnotes": disambig, "issues": issues } );
-}
-
-function collectDisambig( sourceNode ) {
-    var res = [];
-    var links = sourceNode.querySelectorAll( 'div.hatnote a' );
-    var i = 0,
-        len = links.length;
-    for (; i < len; i++) {
-        res.push( links[i].innerHTML );
-    }
-    return res;
-}
-
-function collectIssues( sourceNode ) {
-    var res = [];
-    var issues = sourceNode.querySelectorAll( 'table.ambox' );
-    var i = 0,
-        len = issues.length;
-    for (; i < len; i++) {
-        // .ambox- is used e.g. on eswiki
-        res.push( issues[i].querySelector( '.mbox-text, .ambox-text' ).innerHTML );
-    }
-    return res;
-}
 
 module.exports = new ActionsHandler();

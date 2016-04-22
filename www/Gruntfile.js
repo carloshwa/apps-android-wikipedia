@@ -1,96 +1,116 @@
+/*jshint node:true */
 module.exports = function ( grunt ) {
-    var allScriptFiles = [
-        "js/main.js",
-        "js/tranformer.js",
-        "js/transforms.js",
-        "js/bridge.js",
-        "js/actions.js",
-        "js/editaction.js",
-        "js/issues.js",
-        "js/disambig.js",
-        "js/sections.js",
-        "js/rtlsupport.js",
-        "lib/js/classList.js",
-        "tests/*.js"
-    ];
-    var allHTMLFiles = [
-        "index.html",
-        "tests/index.html"
-    ];
-    // FIXME: Unconditionally included polyfills. Should be included only for Android 2.3
-    var oldDroidPolyfills = [
-        "lib/js/classList.js"
-    ];
+	var allScriptFiles = [
+		"js/bridge.js",
+		"js/main.js",
+		"js/utilities.js",
+		"js/transformer.js",
+		"js/transforms/*.js",
+		"js/transforms/service/*.js",
+		"js/actions.js",
+		"js/disambig.js",
+		"js/editaction.js",
+		"js/issues.js",
+		"js/loader.js",
+		"js/night.js",
+		"js/preview.js",
+		"js/rtlsupport.js",
+		"js/sections.js",
+		"tests/*.js"
+	];
+	var allHTMLFiles = [
+		"index.html",
+		"tests/index.html"
+	];
+	var distFolder = "../app/src/main/assets/";
 
-    grunt.initConfig( {
-        pkg: grunt.file.readJSON( "package.json" ),
-        browserify: {
-            dist: {
-                files: {
-                    "bundle.js": [
-                        "js/loader.js",
-                        "lib/js/css-color-parser.js",
-                        "js/main.js",
-                        "js/night.js",
-                        "js/transformer.js",
-                        "js/transforms.js",
-                        "js/bridge.js",
-                        "js/actions.js",
-                        "js/editaction.js",
-                        "js/issues.js",
-                        "js/disambig.js",
-                        "js/sections.js",
-                        "js/rtlsupport.js"
-                    ].concat( oldDroidPolyfills ),
-                    "bundle-test.js": [
-                        "js/loader.js",
-                        "js/main.js",
-                        "js/bridge.js",
-                        "tests/*.js"
-                    ].concat( oldDroidPolyfills ),
-                    "preview.js": [
-                        "js/loader.js",
-                        "js/bridge.js",
-                        "js/night.js",
-                        "js/actions.js",
-                        "js/preview.js",
-                        "js/rtlsupport.js"
-                    ].concat( oldDroidPolyfills )
-                }
-            }
-        },
-        jshint: {
-            allFiles: allScriptFiles,
-            options: {
-                jshintrc: ".jshintrc"
-            }
-        },
-        copy: {
-            main: {
-                files: [
-                    // App files
-                    {src: ["bundle.js", "index.html"], dest: "../wikipedia/assets/"},
+	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
+	grunt.loadNpmTasks( 'grunt-jsonlint' );
+	grunt.loadNpmTasks( 'grunt-browserify' );
+	grunt.loadNpmTasks( 'grunt-contrib-copy' );
+	grunt.loadNpmTasks( 'grunt-contrib-watch' );
 
-                    // Test files
-                    {src: ["bundle-test.js", "tests/index.html"], dest: "../wikipedia/assets/"},
+	grunt.initConfig( {
+		pkg: grunt.file.readJSON( "package.json" ),
+		jshint: {
+			options: {
+				jshintrc: true
+			},
+			all: [
+				'js/*.js',
+				'js/transforms/*.js',
+				'!node_modules/**',
+				'!lib/**'
+			]
+		},
+		jsonlint: {
+			all: [
+				'../**/*.json',
+				'**/*.json',
+				'!../www/node_modules/**',
+				'!node_modules/**'
+			]
+		},
+		browserify: {
+			dist: {
+				files: {
+					"bundle.js": [
+						"js/bridge.js",
+						"js/main.js",
+						"js/utilities.js",
+						"js/transformer.js",
+						"js/transforms/*.js",
+						"js/transforms/service/*.js",
+						"js/actions.js",
+						"js/disambig.js",
+						"js/editaction.js",
+						"js/issues.js",
+						"js/loader.js",
+						"js/night.js",
+						"js/preview.js",
+						"js/rtlsupport.js",
+						"js/sections.js"
+					],
+					"bundle-test.js": [
+						"js/loader.js",
+						"js/main.js",
+						"js/bridge.js",
+						"tests/*.js"
+					],
+					"preview.js": [
+						"js/loader.js",
+						"js/bridge.js",
+						"js/night.js",
+						"js/actions.js",
+						"js/preview.js",
+						"js/rtlsupport.js",
+						"js/util.js"
+					]
+				}
+			}
+		},
+		copy: {
+			main: {
+				files: [
+					// App files
+					{ src: [ "bundle.js", "index.html" ], dest: distFolder },
 
-                    // Preview files
-                    { src: ["preview.js", "preview.html"], dest: "../wikipedia/assets/" },
-                ]
-            }
-        },
-        watch: {
-            scripts: {
-                files: allScriptFiles.concat( allHTMLFiles ),
-                tasks: ["default"]
-            }
-        }
-    } );
+					// Test files
+					{ src: [ "bundle-test.js", "tests/index.html" ], dest: distFolder },
 
-    grunt.loadNpmTasks( 'grunt-browserify' );
-    grunt.loadNpmTasks( 'grunt-contrib-jshint' );
-    grunt.loadNpmTasks( 'grunt-contrib-copy' );
-    grunt.loadNpmTasks( 'grunt-contrib-watch' );
+					// Preview files
+					{ src: [ "preview.js", "preview.html" ], dest: distFolder },
+				]
+			}
+		},
+		watch: {
+			scripts: {
+				files: allScriptFiles.concat( allHTMLFiles ),
+				tasks: [ "default" ]
+			}
+		}
+	} );
 
-    grunt.registerTask( 'default', [ 'browserify', 'copy' ] );
+	grunt.registerTask( 'test', [ 'jshint', 'jsonlint', 'browserify', 'copy' ] );
+	grunt.registerTask( 'default', 'test' );
 };

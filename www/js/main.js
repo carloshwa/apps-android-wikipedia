@@ -1,4 +1,5 @@
 var bridge = require( "./bridge" );
+var transformer = require("./transformer");
 
 bridge.registerListener( "requestImagesList", function( payload ) {
     var imageURLs = [];
@@ -19,6 +20,7 @@ function replaceImageSrc( payload ) {
         var img = images[i];
         img.setAttribute( "src", payload.newURL );
         img.setAttribute( "data-old-src", payload.originalURL );
+        img.removeAttribute( "srcset" );
     }
 }
 bridge.registerListener( "replaceImageSrc", replaceImageSrc );
@@ -43,4 +45,8 @@ bridge.registerListener( "setPageProtected", function( payload ) {
     else if (el.classList.contains("no-editing") && !payload.noedit) {
         el.classList.remove("no-editing");
     }
+} );
+
+bridge.registerListener( "setDecorOffset", function( payload ) {
+    transformer.setDecorOffset(payload.offset);
 } );

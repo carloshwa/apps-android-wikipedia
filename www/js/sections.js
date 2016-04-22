@@ -1,11 +1,13 @@
 var bridge = require("./bridge");
 var transformer = require("./transformer");
+var clickHandlerSetup = require("./onclick");
 
 bridge.registerListener( "clearContents", function() {
     clearContents();
 });
 
 bridge.registerListener( "setMargins", function( payload ) {
+    document.getElementById( "content" ).style.marginTop = payload.marginTop + "px";
     document.getElementById( "content" ).style.marginLeft = payload.marginLeft + "px";
     document.getElementById( "content" ).style.marginRight = payload.marginRight + "px";
 });
@@ -16,6 +18,45 @@ bridge.registerListener( "setPaddingTop", function( payload ) {
 
 bridge.registerListener( "setPaddingBottom", function( payload ) {
     document.getElementById( "content" ).style.paddingBottom = payload.paddingBottom + "px";
+});
+
+bridge.registerListener( "beginNewPage", function( payload ) {
+    clearContents();
+    // fire an event back to the app, but with a slight timeout, which should
+    // have the effect of "waiting" until the page contents have cleared before sending the
+    // event, allowing synchronization of sorts between the WebView and the app.
+    // (If we find a better way to synchronize the two, it can be done here, as well)
+    setTimeout( function() {
+        bridge.sendMessage( "onBeginNewPage", payload );
+    }, 10);
+});
+
+function getLeadParagraph() {
+    var text = "";
+    var plist = document.getElementsByTagName( "p" );
+    if (plist.length > 0) {
+        text = plist[0].innerText;
+    }
+    return text;
+}
+
+// Returns currently highlighted text.
+// If fewer than two characters are highlighted, returns the text of the first paragraph.
+bridge.registerListener( "getTextSelection", function( payload ) {
+    var text = window.getSelection().toString().trim();
+    if (text.length < 2 && payload.purpose === "share") {
+        text = getLeadParagraph();
+    }
+    if (text.length > 250) {
+        text = text.substring(0, 249);
+    }
+    if (payload.purpose === "edit_here") {
+        var range = window.getSelection().getRangeAt(0);
+        var newRangeStart = Math.max(0, range.startOffset - 20);
+        range.setStart(range.startContainer, newRangeStart);
+        text = range.toString();
+    }
+    bridge.sendMessage( "onGetTextSelection", { "purpose" : payload.purpose, "text" : text, "sectionID" : getCurrentSection() } );
 });
 
 bridge.registerListener( "displayLeadSection", function( payload ) {
@@ -32,17 +73,13 @@ bridge.registerListener( "displayLeadSection", function( payload ) {
     var issuesContainer = document.createElement( "div" );
     issuesContainer.setAttribute( "dir", window.directionality );
     issuesContainer.id = "issues_container";
-    issuesContainer.className = "issues_container";
     document.getElementById( "content" ).appendChild( issuesContainer );
 
-    var editButton = document.createElement( "a" );
-    editButton.setAttribute( 'data-id', payload.section.id );
-    editButton.setAttribute( 'data-action', "edit_section" );
-    editButton.className = "edit_section_button";
+    var editButton = buildEditSectionButton( payload.section.id );
 
     var content = document.createElement( "div" );
     content.setAttribute( "dir", window.directionality );
-    content.innerHTML = editButton.outerHTML + payload.section.text;
+    content.innerHTML = payload.section.text;
     content.id = "content_block_0";
 
     window.apiLevel = payload.apiLevel;
@@ -52,46 +89,70 @@ bridge.registerListener( "displayLeadSection", function( payload ) {
     window.string_expand_refs = payload.string_expand_refs;
     window.pageTitle = payload.title;
     window.isMainPage = payload.isMainPage;
+    window.fromRestBase = payload.fromRestBase;
+    window.isBeta = payload.isBeta;
+    window.siteLanguage = payload.siteLanguage;
 
-    content = transformer.transform( "leadSection", content );
-    content = transformer.transform( "section", content );
-    content = transformer.transform( "hideTables", content );
-    content = transformer.transform( "hideIPA", content );
+    // append the content to the DOM now, so that we can obtain
+    // dimension measurements for items.
+    document.getElementById( "content" ).appendChild( content );
 
-    content = transformer.transform("displayDisambigLink", content);
-    content = transformer.transform("displayIssuesLink", content);
+    // Content service transformations
+    if (!window.fromRestBase) {
+        transformer.transform( "moveFirstGoodParagraphUp" );
 
+        transformer.transform( "hideRedLinks", content );
+        transformer.transform( "setMathFormulaImageMaxWidth", content );
+        transformer.transform( "anchorPopUpMediaTransforms", content );
+        transformer.transform( "hideIPA", content );
+    } else {
+        clickHandlerSetup.addIPAonClick( content );
+    }
+
+    // client only transformations:
+    transformer.transform( "addDarkModeStyles", content ); // client setting
+    transformer.transform( "setDivWidth", content ); // offsetWidth
+
+    if (!window.isMainPage) {
+        transformer.transform( "hideTables", content ); // clickHandler
+        transformer.transform( "addImageOverflowXContainers", content ); // offsetWidth
+        transformer.transform( "widenImages", content ); // offsetWidth
+    }
+
+    // insert the edit pencil
+    content.insertBefore( editButton, content.firstChild );
+
+    transformer.transform("displayDisambigLink", content);
+    transformer.transform("displayIssuesLink", content);
+
+    document.getElementById( "loading_sections").className = "loading";
+
+    bridge.sendMessage( "pageInfo", {
+      "issues" : collectIssues(),
+      "disambiguations" : collectDisambig()
+    });
     //if there were no page issues, then hide the container
     if (!issuesContainer.hasChildNodes()) {
         document.getElementById( "content" ).removeChild(issuesContainer);
     }
-    //update the text of the disambiguation link, if there is one
-    var disambigBtn = document.getElementById( "disambig_button" );
-    if (disambigBtn !== null) {
-        disambigBtn.innerText = payload.string_page_similar_titles;
-    }
-    //update the text of the page-issues link, if there is one
-    var issuesBtn = document.getElementById( "issues_button" );
-    if (issuesBtn !== null) {
-        issuesBtn.innerText = payload.string_page_issues;
-    }
-    //if we have both issues and disambiguation, then insert the separator
-    if (issuesBtn !== null && disambigBtn !== null) {
-        var separator = document.createElement( 'span' );
-        separator.innerText = '|';
-        separator.className = 'issues_separator';
-        issuesContainer.insertBefore(separator, issuesBtn.parentNode);
-    }
 
-    document.getElementById( "content" ).appendChild( content );
-
-    document.getElementById( "loading_sections").className = "loading";
     scrolledOnLoad = false;
 });
 
 function clearContents() {
     document.getElementById( "content" ).innerHTML = "";
     window.scrollTo( 0, 0 );
+}
+
+function buildEditSectionButton(id) {
+    var editButtonWrapper = document.createElement( "span" );
+    editButtonWrapper.className = "edit_section_button_wrapper android";
+    var editButton = document.createElement( "a" );
+    editButton.setAttribute( 'data-id', id );
+    editButton.setAttribute( 'data-action', "edit_section" );
+    editButton.className = "edit_section_button android";
+    editButtonWrapper.appendChild( editButton );
+    return editButtonWrapper;
 }
 
 function elementsForSection( section ) {
@@ -102,20 +163,33 @@ function elementsForSection( section ) {
     heading.className = "section_heading";
     heading.setAttribute( 'data-id', section.id );
 
-    var editButton = document.createElement( "a" );
-    editButton.setAttribute( 'data-id', section.id );
-    editButton.setAttribute( 'data-action', "edit_section" );
-    editButton.className = "edit_section_button";
-    heading.appendChild( editButton );
+    heading.appendChild( buildEditSectionButton( section.id ) );
 
     var content = document.createElement( "div" );
     content.setAttribute( "dir", window.directionality );
     content.innerHTML = section.text;
     content.id = "content_block_" + section.id;
-    content = transformer.transform( "section", content );
-    content = transformer.transform( "hideTables", content );
-    content = transformer.transform( "hideIPA", content );
-    content = transformer.transform( "hideRefs", content );
+
+    // Content service transformations
+    if (!window.fromRestBase) {
+        transformer.transform( "hideRedLinks", content );
+        transformer.transform( "setMathFormulaImageMaxWidth", content );
+        transformer.transform( "anchorPopUpMediaTransforms", content );
+        transformer.transform( "hideIPA", content );
+    } else {
+        clickHandlerSetup.addIPAonClick( content );
+    }
+
+    transformer.transform( "addDarkModeStyles", content ); // client setting
+    transformer.transform( "setDivWidth", content ); // offsetWidth
+
+    transformer.transform( "hideRefs", content ); // clickHandler
+
+    if (!window.isMainPage) {
+        transformer.transform( "hideTables", content ); // clickHandler
+        transformer.transform( "addImageOverflowXContainers", content ); // offsetWidth
+        transformer.transform( "widenImages", content ); // offsetWidth
+    }
 
     return [ heading, content ];
 }
@@ -131,7 +205,9 @@ bridge.registerListener( "displaySection", function ( payload ) {
             scrolledOnLoad = true;
         }
         document.getElementById( "loading_sections").className = "";
-        bridge.sendMessage( "pageLoadComplete", { } );
+        bridge.sendMessage( "pageLoadComplete", {
+          "sequence": payload.sequence,
+          "savedPage": payload.savedPage });
     } else {
         var contentWrapper = document.getElementById( "content" );
         elementsForSection(payload.section).forEach(function (element) {
@@ -146,13 +222,37 @@ bridge.registerListener( "displaySection", function ( payload ) {
         if ( typeof payload.fragment === "string" && payload.fragment.length > 0 && payload.section.anchor === payload.fragment) {
             scrollToSection( payload.fragment );
         }
-        bridge.sendMessage( "requestSection", { "index": payload.section.id + 1 });
+        bridge.sendMessage( "requestSection", { "sequence": payload.sequence, "savedPage": payload.savedPage, "index": payload.section.id + 1 });
     }
 });
 
 bridge.registerListener( "scrollToSection", function ( payload ) {
     scrollToSection( payload.anchor );
 });
+
+function collectDisambig() {
+    var res = [];
+    var links = document.querySelectorAll( 'div.hatnote a' );
+    var i = 0,
+        len = links.length;
+    for (; i < len; i++) {
+        // Pass the href; we'll decode it into a proper page title in Java
+        res.push( links[i].getAttribute( 'href' ) );
+    }
+    return res;
+}
+
+function collectIssues() {
+    var res = [];
+    var issues = document.querySelectorAll( 'table.ambox' );
+    var i = 0,
+        len = issues.length;
+    for (; i < len; i++) {
+        // .ambox- is used e.g. on eswiki
+        res.push( issues[i].querySelector( '.mbox-text, .ambox-text' ).innerHTML );
+    }
+    return res;
+}
 
 function scrollToSection( anchor ) {
     if (anchor === "heading_0") {
@@ -161,7 +261,7 @@ function scrollToSection( anchor ) {
         window.scrollTo( 0, 0 );
     } else {
         var el = document.getElementById( anchor );
-        var scrollY = el.offsetTop - 48;
+        var scrollY = el.offsetTop - transformer.getDecorOffset();
         window.scrollTo( 0, scrollY );
     }
 }

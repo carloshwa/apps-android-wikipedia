@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 import os
 import xml.etree.ElementTree as ET
 
-RES_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), "../wikipedia/res"))
+RES_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), "../app/src/main/res"))
 EN_STRINGS = os.path.join(RES_FOLDER, "values/strings.xml")
 QQ_STRINGS = os.path.join(RES_FOLDER, "values-qq/strings.xml")
 
@@ -21,4 +22,4 @@ for child in qqroot:
 # Iterate through all messages and check that they're documented
 for child in enroot:
     if child.attrib['name'] not in qqmsgs:
-        print child.attrib['name'] + " is undocumented!"
+        print(child.attrib['name'] + " is undocumented!")

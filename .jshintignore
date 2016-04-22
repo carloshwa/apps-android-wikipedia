@@ -1,2 +1,4 @@
 www/lib/*
-wikipedia/assets/*
+app/src/main/assets/*
+node_modules/
+www/node_modules/
